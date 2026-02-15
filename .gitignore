@@ -1,0 +1,33 @@
+# Session artifacts
+history.jsonl
+journal.md
+debug/
+session-env/
+shell-snapshots/
+todos/
+paste-cache/
+
+# Plans (temporary artifacts)
+plans/
+
+# Project snapshots (belong in actual repos)
+projects/
+
+# Downloaded/cached data
+plugins/
+cache/
+file-history/
+
+# User-specific configs
+settings.json
+
+# Analytics/telemetry
+stats-cache.json
+statsig/
+telemetry/
+
+# OS files
+.DS_Store
+
+# Sensitive - only include if sanitized
+claude_desktop_config.json
