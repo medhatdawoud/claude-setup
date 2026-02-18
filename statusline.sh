@@ -95,5 +95,22 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     METRICS=$(printf ' \033[90m|\033[0m \033[96m%s\033[0m \033[90m|\033[0m ctx: %s \033[90m|\033[0m \033[33m%s\033[0m tok \033[90m|\033[0m cost: \033[32m$%s\033[0m' "$MODEL_NAME" "$CONTEXT_INFO" "$TOKEN_DISPLAY" "$TOTAL_COST")
 fi
 
+# Session lifetime
+DURATION_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
+if [ "$DURATION_MS" != "0" ] && [ "$DURATION_MS" != "null" ]; then
+    DURATION_SEC=$((DURATION_MS / 1000))
+    HOURS=$((DURATION_SEC / 3600))
+    MINS=$(((DURATION_SEC % 3600) / 60))
+    SECS=$((DURATION_SEC % 60))
+    if [ $HOURS -gt 0 ]; then
+        TIME_DISPLAY="${HOURS}h ${MINS}m"
+    elif [ $MINS -gt 0 ]; then
+        TIME_DISPLAY="${MINS}m ${SECS}s"
+    else
+        TIME_DISPLAY="${SECS}s"
+    fi
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m \033[95m%s\033[0m' "$TIME_DISPLAY")"
+fi
+
 # Green arrow + cyan directory + git info + metrics (matching robbyrussell theme)
 printf '\033[32m➜\033[0m  \033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
