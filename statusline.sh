@@ -110,27 +110,24 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     USAGE_LOG="$HOME/.claude/usage-log.json"
     SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
     TIMESTAMP=$(date +%s)
-    TODAY_START=$(date -j -f "%Y-%m-%d" "$(date +%Y-%m-%d)" +%s 2>/dev/null || date -d "$(date +%Y-%m-%d)" +%s 2>/dev/null)
+    TODAY_START=$(date -j -v0H -v0M -v0S +%s 2>/dev/null || date -d "$(date +%Y-%m-%d) 00:00:00" +%s 2>/dev/null)
 
-    # Read existing usage data and calculate today's total (excluding current session)
-    if [ -f "$USAGE_LOG" ]; then
-        TODAY_TOTAL=$(jq -r --arg today_start "$TODAY_START" --arg sid "$SESSION_ID" \
-            'map(select(.timestamp >= ($today_start | tonumber) and .session_id != $sid) | .cost) | add // 0' \
-            "$USAGE_LOG" 2>/dev/null || echo "0")
-    else
-        TODAY_TOTAL="0"
+    # Initialize log if it doesn't exist
+    if [ ! -f "$USAGE_LOG" ]; then
         echo "[]" > "$USAGE_LOG"
     fi
 
-    # Calculate today's total including current session
-    TODAY_WITH_CURRENT=$(echo "$TODAY_TOTAL $TOTAL_COST" | awk '{printf "%.2f", $1 + $2}')
-
-    # Update usage log with current session
+    # Update usage log with current session first
     jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg ts "$TIMESTAMP" \
        'map(select(.session_id != $sid)) + [{"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber)}]' \
        "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
 
-    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_WITH_CURRENT")
+    # Now calculate today's total from the updated log
+    TODAY_TOTAL=$(jq -r --arg today_start "$TODAY_START" \
+        'map(select(.timestamp >= ($today_start | tonumber)) | .cost) | add // 0' \
+        "$USAGE_LOG" 2>/dev/null || echo "0")
+
+    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
     METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s \033[90m|\033[0m ⚡ \033[33m%s\033[0m \033[90m|\033[0m 💵 %s' "$CONTEXT_PCT" "$CONTEXT_INFO" "$TOKEN_DISPLAY" "$COST_DISPLAY")
 fi
