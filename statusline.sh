@@ -11,9 +11,9 @@ if command git rev-parse --git-dir > /dev/null 2>&1; then
     if [ -n "$BRANCH" ]; then
         # Check if there are uncommitted changes
         if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
-            GIT_STATUS=" $(printf '\033[34mgit:(\033[31m%s\033[34m) \033[33m✗\033[0m' "$BRANCH")"
+            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[31m%s \033[33m✗\033[0m' "$BRANCH")"
         else
-            GIT_STATUS=" $(printf '\033[34mgit:(\033[31m%s\033[34m)\033[0m' "$BRANCH")"
+            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[31m%s\033[0m' "$BRANCH")"
         fi
     fi
 fi
@@ -30,17 +30,31 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     WINDOW_SIZE=$(echo "$CONTEXT_WINDOW" | jq -r '.context_window_size')
     CURRENT_USAGE=$(echo "$CONTEXT_WINDOW" | jq '.current_usage')
 
-    # Calculate current context percentage
+    # Calculate current context as a progress bar
+    BAR_WIDTH=8
     if [ "$CURRENT_USAGE" != "null" ]; then
         INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens')
         CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens')
         CACHE_READ=$(echo "$CURRENT_USAGE" | jq -r '.cache_read_input_tokens')
         CURRENT_CONTEXT=$((INPUT_TOKENS + CACHE_CREATE + CACHE_READ))
         CONTEXT_PCT=$((CURRENT_CONTEXT * 100 / WINDOW_SIZE))
-        CONTEXT_INFO=$(printf '\033[35m%d%%\033[0m' "$CONTEXT_PCT")
+        FILLED=$((CONTEXT_PCT * BAR_WIDTH / 100))
     else
-        CONTEXT_INFO=$(printf '\033[35m0%%\033[0m')
+        CONTEXT_PCT=0
+        FILLED=0
     fi
+    EMPTY=$((BAR_WIDTH - FILLED))
+    BAR_FILLED=$(printf '%0.s█' $(seq 1 $FILLED 2>/dev/null))
+    BAR_EMPTY=$(printf '%0.s░' $(seq 1 $EMPTY 2>/dev/null))
+    # Color: green <50%, yellow 50-79%, red 80%+
+    if [ "$CONTEXT_PCT" -ge 80 ]; then
+        BAR_COLOR='\033[31m'
+    elif [ "$CONTEXT_PCT" -ge 50 ]; then
+        BAR_COLOR='\033[33m'
+    else
+        BAR_COLOR='\033[32m'
+    fi
+    CONTEXT_INFO=$(printf '%b%s\033[90m%s\033[0m' "$BAR_COLOR" "$BAR_FILLED" "$BAR_EMPTY")
 
     # Calculate session cost based on model pricing
     # Pricing per million tokens (as of Jan 2025)
@@ -92,7 +106,33 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         TOKEN_DISPLAY="$TOTAL_TOKENS"
     fi
 
-    METRICS=$(printf ' \033[90m|\033[0m \033[96m%s\033[0m \033[90m|\033[0m ctx: %s \033[90m|\033[0m \033[33m%s\033[0m tok \033[90m|\033[0m cost: \033[32m$%s\033[0m' "$MODEL_NAME" "$CONTEXT_INFO" "$TOKEN_DISPLAY" "$TOTAL_COST")
+    # Track and calculate today's total usage
+    USAGE_LOG="$HOME/.claude/usage-log.json"
+    SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
+    TIMESTAMP=$(date +%s)
+    TODAY_START=$(date -j -f "%Y-%m-%d" "$(date +%Y-%m-%d)" +%s 2>/dev/null || date -d "$(date +%Y-%m-%d)" +%s 2>/dev/null)
+
+    # Read existing usage data and calculate today's total (excluding current session)
+    if [ -f "$USAGE_LOG" ]; then
+        TODAY_TOTAL=$(jq -r --arg today_start "$TODAY_START" --arg sid "$SESSION_ID" \
+            'map(select(.timestamp >= ($today_start | tonumber) and .session_id != $sid) | .cost) | add // 0' \
+            "$USAGE_LOG" 2>/dev/null || echo "0")
+    else
+        TODAY_TOTAL="0"
+        echo "[]" > "$USAGE_LOG"
+    fi
+
+    # Calculate today's total including current session
+    TODAY_WITH_CURRENT=$(echo "$TODAY_TOTAL $TOTAL_COST" | awk '{printf "%.2f", $1 + $2}')
+
+    # Update usage log with current session
+    jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg ts "$TIMESTAMP" \
+       'map(select(.session_id != $sid)) + [{"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber)}]' \
+       "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
+
+    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_WITH_CURRENT")
+
+    METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s \033[90m|\033[0m ⚡ \033[33m%s\033[0m \033[90m|\033[0m 💵 %s' "$CONTEXT_PCT" "$CONTEXT_INFO" "$TOKEN_DISPLAY" "$COST_DISPLAY")
 fi
 
 # Session lifetime
@@ -109,8 +149,12 @@ if [ "$DURATION_MS" != "0" ] && [ "$DURATION_MS" != "null" ]; then
     else
         TIME_DISPLAY="${SECS}s"
     fi
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m \033[95m%s\033[0m' "$TIME_DISPLAY")"
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🕐 \033[95m%s\033[0m' "$TIME_DISPLAY")"
 fi
 
-# Green arrow + cyan directory + git info + metrics (matching robbyrussell theme)
-printf '\033[32m➜\033[0m  \033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
+# Append model name at the end
+if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
+fi
+
+printf '📂 \033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
