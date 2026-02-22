@@ -54,7 +54,8 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         FILLED=0
     fi
     EMPTY=$((BAR_WIDTH - FILLED))
-    BAR_FILLED=$(printf '%0.s━' $(seq 1 $FILLED 2>/dev/null))
+    BAR_FILLED=""
+    [ "$FILLED" -gt 0 ] && BAR_FILLED=$(printf '%0.s━' $(seq 1 $FILLED 2>/dev/null))
     BAR_EMPTY=$(printf '%0.s─' $(seq 1 $EMPTY 2>/dev/null))
     # Color: green <50%, yellow 50-79%, red 80%+
     if [ "$CONTEXT_PCT" -ge 80 ]; then
