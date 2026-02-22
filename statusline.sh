@@ -123,9 +123,10 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
        "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
 
     # Now calculate today's total from the updated log
-    TODAY_TOTAL=$(jq -r --arg today_start "$TODAY_START" \
+    TODAY_TOTAL_RAW=$(jq -r --arg today_start "$TODAY_START" \
         'map(select(.timestamp >= ($today_start | tonumber)) | .cost) | add // 0' \
         "$USAGE_LOG" 2>/dev/null || echo "0")
+    TODAY_TOTAL=$(echo "$TODAY_TOTAL_RAW" | awk '{printf "%.2f", $1}')
 
     COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
