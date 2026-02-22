@@ -31,7 +31,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     CURRENT_USAGE=$(echo "$CONTEXT_WINDOW" | jq '.current_usage')
 
     # Calculate current context as a progress bar
-    BAR_WIDTH=8
+    BAR_WIDTH=10
     if [ "$CURRENT_USAGE" != "null" ]; then
         INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens')
         CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens')
@@ -126,7 +126,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     TODAY_TOTAL_RAW=$(jq -r --arg today_start "$TODAY_START" \
         'map(select(.timestamp >= ($today_start | tonumber)) | .cost) | add // 0' \
         "$USAGE_LOG" 2>/dev/null || echo "0")
-    TODAY_TOTAL=$(echo "$TODAY_TOTAL_RAW" | awk '{printf "%.2f", $1}')
+    TODAY_TOTAL=$(echo "$TODAY_TOTAL_RAW" | awk '{printf "%.3f", $1}')
 
     COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
