@@ -30,8 +30,8 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     WINDOW_SIZE=$(echo "$CONTEXT_WINDOW" | jq -r '.context_window_size')
     CURRENT_USAGE=$(echo "$CONTEXT_WINDOW" | jq '.current_usage')
 
-    # Calculate current context as a progress bar
-    BAR_WIDTH=10
+    # Calculate current context as a thin progress bar (12 chars = ~8.3% per segment)
+    BAR_WIDTH=12
     if [ "$CURRENT_USAGE" != "null" ]; then
         INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens')
         CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens')
@@ -44,8 +44,8 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         FILLED=0
     fi
     EMPTY=$((BAR_WIDTH - FILLED))
-    BAR_FILLED=$(printf '%0.s█' $(seq 1 $FILLED 2>/dev/null))
-    BAR_EMPTY=$(printf '%0.s░' $(seq 1 $EMPTY 2>/dev/null))
+    BAR_FILLED=$(printf '%0.s━' $(seq 1 $FILLED 2>/dev/null))
+    BAR_EMPTY=$(printf '%0.s─' $(seq 1 $EMPTY 2>/dev/null))
     # Color: green <50%, yellow 50-79%, red 80%+
     if [ "$CONTEXT_PCT" -ge 80 ]; then
         BAR_COLOR='\033[31m'
