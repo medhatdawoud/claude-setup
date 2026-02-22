@@ -140,15 +140,15 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
-    # Build git status with diff stats and context
-    CONTEXT_PART="$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")"
+    # Build git status with diff stats and tokens
+    TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m' "$TOKEN_DISPLAY")"
     if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
-        GIT_STATUS="${GIT_BRANCH_BASE}${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')${CONTEXT_PART}"
+        GIT_STATUS="${GIT_BRANCH_BASE}${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')${TOKEN_PART}"
     else
-        GIT_STATUS="${GIT_BRANCH_BASE}${CONTEXT_PART}"
+        GIT_STATUS="${GIT_BRANCH_BASE}${TOKEN_PART}"
     fi
 
-    METRICS=$(printf ' \033[90m|\033[0m ⚡ \033[33m%s\033[0m \033[90m|\033[0m 💵 %s' "$TOKEN_DISPLAY" "$COST_DISPLAY")
+    METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s \033[90m|\033[0m 💵 %s' "$CONTEXT_PCT" "$CONTEXT_INFO" "$COST_DISPLAY")
 fi
 
 # Append model name at the end
