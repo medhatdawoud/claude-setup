@@ -23,12 +23,8 @@ if command git rev-parse --git-dir > /dev/null 2>&1; then
             DIFF_DISPLAY="${DIFF_DISPLAY}$(printf ' \033[31m-%s\033[0m' "$DELETIONS")"
         fi
 
-        # Check if there are uncommitted changes
-        if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
-            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[37m%s\033[0m' "$BRANCH")${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')"
-        else
-            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[37m%s\033[0m' "$BRANCH")"
-        fi
+        # Format token count for git status line (will be populated later)
+        GIT_BRANCH_BASE="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[37m%s\033[0m' "$BRANCH")"
     fi
 fi
 
@@ -144,24 +140,15 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
-    METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s \033[90m|\033[0m ⚡ \033[33m%s\033[0m \033[90m|\033[0m 💵 %s' "$CONTEXT_PCT" "$CONTEXT_INFO" "$TOKEN_DISPLAY" "$COST_DISPLAY")
-fi
-
-# Session lifetime
-DURATION_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
-if [ "$DURATION_MS" != "0" ] && [ "$DURATION_MS" != "null" ]; then
-    DURATION_SEC=$((DURATION_MS / 1000))
-    HOURS=$((DURATION_SEC / 3600))
-    MINS=$(((DURATION_SEC % 3600) / 60))
-    SECS=$((DURATION_SEC % 60))
-    if [ $HOURS -gt 0 ]; then
-        TIME_DISPLAY="${HOURS}h ${MINS}m"
-    elif [ $MINS -gt 0 ]; then
-        TIME_DISPLAY="${MINS}m ${SECS}s"
+    # Build git status with diff stats and context
+    CONTEXT_PART="$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")"
+    if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
+        GIT_STATUS="${GIT_BRANCH_BASE}${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')${CONTEXT_PART}"
     else
-        TIME_DISPLAY="${SECS}s"
+        GIT_STATUS="${GIT_BRANCH_BASE}${CONTEXT_PART}"
     fi
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🕐 \033[95m%s\033[0m' "$TIME_DISPLAY")"
+
+    METRICS=$(printf ' \033[90m|\033[0m ⚡ \033[33m%s\033[0m \033[90m|\033[0m 💵 %s' "$TOKEN_DISPLAY" "$COST_DISPLAY")
 fi
 
 # Append model name at the end
@@ -169,4 +156,4 @@ if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
 fi
 
-printf '📂 \033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
+printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
