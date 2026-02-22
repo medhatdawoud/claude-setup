@@ -9,11 +9,25 @@ cd "$DIR" 2>/dev/null
 if command git rev-parse --git-dir > /dev/null 2>&1; then
     BRANCH=$(command git symbolic-ref --short HEAD 2>/dev/null || command git rev-parse --short HEAD 2>/dev/null)
     if [ -n "$BRANCH" ]; then
+        # Get diff stats for uncommitted changes (staged + unstaged)
+        DIFF_STATS=$(command git diff --numstat HEAD 2>/dev/null | awk '{added+=$1; deleted+=$2} END {print added, deleted}')
+        ADDITIONS=$(echo "$DIFF_STATS" | awk '{print $1}')
+        DELETIONS=$(echo "$DIFF_STATS" | awk '{print $2}')
+
+        # Build diff display
+        DIFF_DISPLAY=""
+        if [ -n "$ADDITIONS" ] && [ "$ADDITIONS" != "0" ]; then
+            DIFF_DISPLAY="${DIFF_DISPLAY}$(printf ' \033[32m+%s\033[0m' "$ADDITIONS")"
+        fi
+        if [ -n "$DELETIONS" ] && [ "$DELETIONS" != "0" ]; then
+            DIFF_DISPLAY="${DIFF_DISPLAY}$(printf ' \033[31m-%s\033[0m' "$DELETIONS")"
+        fi
+
         # Check if there are uncommitted changes
         if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
-            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[31m%s \033[33m✗\033[0m' "$BRANCH")"
+            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[37m%s\033[0m' "$BRANCH")${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')"
         else
-            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[31m%s\033[0m' "$BRANCH")"
+            GIT_STATUS="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[37m%s\033[0m' "$BRANCH")"
         fi
     fi
 fi
