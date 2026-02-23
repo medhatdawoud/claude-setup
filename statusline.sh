@@ -121,21 +121,35 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     USAGE_LOG="$HOME/.claude/usage-log.json"
     SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
     TIMESTAMP=$(date +%s)
-    TODAY_START=$(date -j -v0H -v0M -v0S +%s 2>/dev/null || date -d "$(date +%Y-%m-%d) 00:00:00" +%s 2>/dev/null)
+    TODAY_DATE=$(date +%Y-%m-%d)
 
     # Initialize log if it doesn't exist
     if [ ! -f "$USAGE_LOG" ]; then
         echo "[]" > "$USAGE_LOG"
     fi
 
-    # Update usage log with current session first
-    jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg ts "$TIMESTAMP" \
-       'map(select(.session_id != $sid)) + [{"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber)}]' \
+    # Update usage log: track day_start_cost to handle sessions spanning midnight
+    jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg ts "$TIMESTAMP" --arg today "$TODAY_DATE" \
+       '(map(select(.session_id == $sid)) | first // null) as $existing |
+        map(select(.session_id != $sid)) + [
+          if $existing == null then
+            {"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber), "day_start_cost": 0, "date": $today}
+          elif $existing.date != $today then
+            {"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber), "day_start_cost": $existing.cost, "date": $today}
+          else
+            $existing + {"cost": ($cost | tonumber), "timestamp": ($ts | tonumber)}
+          end
+        ]' \
        "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
 
-    # Now calculate today's total from the updated log
-    TODAY_TOTAL_RAW=$(jq -r --arg today_start "$TODAY_START" \
-        'map(select(.timestamp >= ($today_start | tonumber)) | .cost) | add // 0' \
+    # Prune entries older than 7 days
+    CUTOFF_DATE=$(date -j -v-7d +%Y-%m-%d 2>/dev/null || date -d "7 days ago" +%Y-%m-%d 2>/dev/null)
+    jq --arg cutoff "$CUTOFF_DATE" 'map(select(.date >= $cutoff))' \
+       "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
+
+    # Calculate today's total: sum (cost - day_start_cost) for sessions active today
+    TODAY_TOTAL_RAW=$(jq -r --arg today "$TODAY_DATE" \
+        '[.[] | select(.date == $today) | (.cost - .day_start_cost)] | add // 0' \
         "$USAGE_LOG" 2>/dev/null || echo "0")
     TODAY_TOTAL=$(echo "$TODAY_TOTAL_RAW" | awk '{printf "%.3f", $1}')
 
