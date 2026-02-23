@@ -117,40 +117,29 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         TOKEN_DISPLAY="$TOTAL_TOKENS"
     fi
 
-    # Track and calculate today's total usage
+    # Track and calculate today's total usage via date-based deltas
     USAGE_LOG="$HOME/.claude/usage-log.json"
     SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
-    TIMESTAMP=$(date +%s)
     TODAY_DATE=$(date +%Y-%m-%d)
+    CUTOFF_DATE=$(date -j -v-7d +%Y-%m-%d 2>/dev/null || date -d "7 days ago" +%Y-%m-%d 2>/dev/null)
 
-    # Initialize log if it doesn't exist
-    if [ ! -f "$USAGE_LOG" ]; then
-        echo "[]" > "$USAGE_LOG"
+    # Initialize or migrate log (old format was a JSON array)
+    if [ ! -f "$USAGE_LOG" ] || ! jq -e 'has("sessions")' "$USAGE_LOG" >/dev/null 2>&1; then
+        echo '{"sessions":{},"daily":{}}' > "$USAGE_LOG"
     fi
 
-    # Update usage log: track day_start_cost to handle sessions spanning midnight
-    jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg ts "$TIMESTAMP" --arg today "$TODAY_DATE" \
-       '(map(select(.session_id == $sid)) | first // null) as $existing |
-        map(select(.session_id != $sid)) + [
-          if $existing == null then
-            {"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber), "day_start_cost": 0, "date": $today}
-          elif $existing.date != $today then
-            {"session_id": $sid, "cost": ($cost | tonumber), "timestamp": ($ts | tonumber), "day_start_cost": $existing.cost, "date": $today}
-          else
-            $existing + {"cost": ($cost | tonumber), "timestamp": ($ts | tonumber)}
-          end
-        ]' \
-       "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
+    # Calculate delta, update session cost, accumulate into today, prune old daily entries
+    jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg today "$TODAY_DATE" --arg cutoff "$CUTOFF_DATE" '
+        ($cost | tonumber) as $current_cost |
+        (.sessions[$sid] // $current_cost) as $last_cost |
+        ([$current_cost - $last_cost, 0] | max) as $delta |
+        .sessions[$sid] = $current_cost |
+        .daily[$today] = ((.daily[$today] // 0) + $delta) |
+        .daily |= with_entries(select(.key >= $cutoff))
+    ' "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
 
-    # Prune entries older than 7 days
-    CUTOFF_DATE=$(date -j -v-7d +%Y-%m-%d 2>/dev/null || date -d "7 days ago" +%Y-%m-%d 2>/dev/null)
-    jq --arg cutoff "$CUTOFF_DATE" 'map(select(.date >= $cutoff))' \
-       "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
-
-    # Calculate today's total: sum (cost - day_start_cost) for sessions active today
-    TODAY_TOTAL_RAW=$(jq -r --arg today "$TODAY_DATE" \
-        '[.[] | select(.date == $today) | (.cost - .day_start_cost)] | add // 0' \
-        "$USAGE_LOG" 2>/dev/null || echo "0")
+    # Read today's total
+    TODAY_TOTAL_RAW=$(jq -r --arg today "$TODAY_DATE" '.daily[$today] // 0' "$USAGE_LOG" 2>/dev/null || echo "0")
     TODAY_TOTAL=$(echo "$TODAY_TOTAL_RAW" | awk '{printf "%.3f", $1}')
 
     COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
