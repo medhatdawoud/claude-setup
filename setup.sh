@@ -10,6 +10,12 @@ CLAUDE_DESKTOP_CONFIG="$HOME/Library/Application Support/Claude"
 echo "Setting up Claude Code configuration..."
 echo ""
 
+# Check required dependencies
+if ! command -v jq &>/dev/null; then
+    echo "ERROR: jq is required but not installed. Install it first (e.g. brew install jq)."
+    exit 1
+fi
+
 # Create .claude directory if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
 
