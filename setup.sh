@@ -4,7 +4,7 @@
 set -e  # Exit on error
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLAUDE_DIR="$HOME/.claude"
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CLAUDE_DESKTOP_CONFIG="$HOME/Library/Application Support/Claude"
 
 echo "Setting up Claude Code configuration..."
