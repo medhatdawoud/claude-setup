@@ -31,6 +31,9 @@ ln -sf "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
 backup_if_exists "$CLAUDE_DIR/statusline.sh"
 ln -sf "$REPO_DIR/statusline.sh" "$CLAUDE_DIR/statusline.sh"
 
+backup_if_exists "$CLAUDE_DIR/subagent-cost-hook.sh"
+ln -sf "$REPO_DIR/subagent-cost-hook.sh" "$CLAUDE_DIR/subagent-cost-hook.sh"
+
 backup_if_exists "$CLAUDE_DIR/agents"
 ln -sf "$REPO_DIR/agents" "$CLAUDE_DIR/agents"
 
@@ -39,6 +42,16 @@ ln -sf "$REPO_DIR/journal" "$CLAUDE_DIR/journal"
 
 backup_if_exists "$CLAUDE_DIR/skills"
 ln -sf "$REPO_DIR/skills" "$CLAUDE_DIR/skills"
+
+# Merge statusLine and SubagentStop hook into settings.json (idempotent, preserves other keys)
+echo ""
+echo "Updating settings.json..."
+SETTINGS="$CLAUDE_DIR/settings.json"
+[ ! -f "$SETTINGS" ] && echo '{}' > "$SETTINGS"
+jq --arg dir "$CLAUDE_DIR" '
+    .statusLine = {"type": "command", "command": ("bash " + $dir + "/statusline.sh")} |
+    .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/subagent-cost-hook.sh")}]}]
+' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
 
 # Setup MCP config (if example exists and user wants to copy)
 if [ -f "$REPO_DIR/claude_desktop_config.example.json" ]; then
