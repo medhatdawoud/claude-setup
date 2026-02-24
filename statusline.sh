@@ -89,10 +89,10 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
             CACHE_READ_COST_PER_M=0.30
             ;;
         *"haiku"*)
-            INPUT_COST_PER_M=0.80
-            OUTPUT_COST_PER_M=4.00
-            CACHE_WRITE_COST_PER_M=1.00
-            CACHE_READ_COST_PER_M=0.08
+            INPUT_COST_PER_M=1.00
+            OUTPUT_COST_PER_M=5.00
+            CACHE_WRITE_COST_PER_M=1.25
+            CACHE_READ_COST_PER_M=0.10
             ;;
         *)
             INPUT_COST_PER_M=3.00
@@ -102,10 +102,38 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
             ;;
     esac
 
-    # Calculate cost (tokens / 1,000,000 * price)
-    INPUT_COST=$(echo "$TOTAL_INPUT $INPUT_COST_PER_M" | awk '{printf "%.4f", ($1 / 1000000) * $2}')
-    OUTPUT_COST=$(echo "$TOTAL_OUTPUT $OUTPUT_COST_PER_M" | awk '{printf "%.4f", ($1 / 1000000) * $2}')
-    TOTAL_COST=$(echo "$INPUT_COST $OUTPUT_COST" | awk '{printf "%.3f", $1 + $2}')
+    # Calculate session cost from JSONL (includes all token types: input, cache_write, cache_read, output)
+    SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
+    SESSION_JSONL=$(find "$HOME/.claude/projects" -name "${SESSION_ID}.jsonl" 2>/dev/null | head -1)
+    if [ -n "$SESSION_JSONL" ]; then
+        TOTAL_COST=$(jq -r '
+            select(.type == "assistant" and .message.id != null) |
+            [.timestamp,
+             .message.id,
+             (.message.model // ""),
+             (.message.usage.input_tokens // 0),
+             (.message.usage.cache_creation_input_tokens // 0),
+             (.message.usage.cache_read_input_tokens // 0),
+             (.message.usage.output_tokens // 0)] | @tsv
+        ' "$SESSION_JSONL" 2>/dev/null | \
+        sort -t"	" -k1,1 | awk -F"	" '
+            function cost(model, inp, cc, cr, out) {
+                if (model ~ /opus-4/)
+                    return (inp/1e6)*15 + (cc/1e6)*18.75 + (cr/1e6)*1.5 + (out/1e6)*75
+                else if (model ~ /haiku/)
+                    return (inp/1e6)*1 + (cc/1e6)*1.25 + (cr/1e6)*0.1 + (out/1e6)*5
+                else
+                    return (inp/1e6)*3 + (cc/1e6)*3.75 + (cr/1e6)*0.3 + (out/1e6)*15
+            }
+            !seen[$2]++ { total += cost($3, $4, $5, $6, $7) }
+            END { printf "%.3f", total+0 }
+        ')
+    else
+        # Fallback: basic cost without cache tokens
+        INPUT_COST=$(echo "$TOTAL_INPUT $INPUT_COST_PER_M" | awk '{printf "%.4f", ($1 / 1000000) * $2}')
+        OUTPUT_COST=$(echo "$TOTAL_OUTPUT $OUTPUT_COST_PER_M" | awk '{printf "%.4f", ($1 / 1000000) * $2}')
+        TOTAL_COST=$(echo "$INPUT_COST $OUTPUT_COST" | awk '{printf "%.3f", $1 + $2}')
+    fi
 
     # Format token count
     TOTAL_TOKENS=$((TOTAL_INPUT + TOTAL_OUTPUT))
@@ -117,30 +145,69 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         TOKEN_DISPLAY="$TOTAL_TOKENS"
     fi
 
-    # Track and calculate today's total usage via date-based deltas
-    USAGE_LOG="$HOME/.claude/usage-log.json"
-    SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
+    # Calculate today's total cost by scanning JSONL files (same source as ccusage)
     TODAY_DATE=$(date +%Y-%m-%d)
-    CUTOFF_DATE=$(date -j -v-7d +%Y-%m-%d 2>/dev/null || date -d "7 days ago" +%Y-%m-%d 2>/dev/null)
+    TODAY_CACHE="$HOME/.claude/usage-today-cache.json"
+    CACHE_AGE=60  # seconds TTL
 
-    # Initialize or migrate log (old format was a JSON array)
-    if [ ! -f "$USAGE_LOG" ] || ! jq -e 'has("sessions")' "$USAGE_LOG" >/dev/null 2>&1; then
-        echo '{"sessions":{},"daily":{}}' > "$USAGE_LOG"
+    # Compute UTC start/end of local "today" for correct timezone-aware filtering
+    # JSONL timestamps are UTC; local today may span two UTC dates
+    TODAY_EPOCH=$(date -j -f "%Y-%m-%d %H:%M:%S" "$TODAY_DATE 00:00:00" "+%s" 2>/dev/null || \
+                  date -d "$TODAY_DATE" "+%s" 2>/dev/null)
+    TOMORROW_EPOCH=$((TODAY_EPOCH + 86400))
+    TODAY_UTC=$(date -j -r "$TODAY_EPOCH" -u "+%Y-%m-%dT%H:%M:%S" 2>/dev/null || \
+                date -u -d "@$TODAY_EPOCH" "+%Y-%m-%dT%H:%M:%S" 2>/dev/null)
+    TOMORROW_UTC=$(date -j -r "$TOMORROW_EPOCH" -u "+%Y-%m-%dT%H:%M:%S" 2>/dev/null || \
+                   date -u -d "@$TOMORROW_EPOCH" "+%Y-%m-%dT%H:%M:%S" 2>/dev/null)
+
+    # Check if cache is valid (same day, within TTL)
+    CACHE_VALID=0
+    if [ -f "$TODAY_CACHE" ]; then
+        CACHE_DATE=$(jq -r '.date // ""' "$TODAY_CACHE" 2>/dev/null)
+        CACHE_TS=$(jq -r '.computed_at // 0' "$TODAY_CACHE" 2>/dev/null)
+        NOW_TS=$(date +%s)
+        if [ "$CACHE_DATE" = "$TODAY_DATE" ] && [ $((NOW_TS - CACHE_TS)) -lt $CACHE_AGE ]; then
+            CACHE_VALID=1
+        fi
     fi
 
-    # Calculate delta, update session cost, accumulate into today, prune old daily entries
-    jq --arg sid "$SESSION_ID" --arg cost "$TOTAL_COST" --arg today "$TODAY_DATE" --arg cutoff "$CUTOFF_DATE" '
-        ($cost | tonumber) as $current_cost |
-        (.sessions[$sid] // $current_cost) as $last_cost |
-        ([$current_cost - $last_cost, 0] | max) as $delta |
-        .sessions[$sid] = $current_cost |
-        .daily[$today] = ((.daily[$today] // 0) + $delta) |
-        .daily |= with_entries(select(.key >= $cutoff))
-    ' "$USAGE_LOG" > "${USAGE_LOG}.tmp" 2>/dev/null && mv "${USAGE_LOG}.tmp" "$USAGE_LOG"
+    if [ "$CACHE_VALID" = "1" ]; then
+        TODAY_TOTAL_RAW=$(jq -r '.total' "$TODAY_CACHE" 2>/dev/null)
+    else
+        TODAY_TOTAL_RAW=$(find "$HOME/.claude/projects" -name "*.jsonl" -print0 2>/dev/null | \
+            xargs -0 jq -r --arg today_utc "$TODAY_UTC" --arg tomorrow_utc "$TOMORROW_UTC" '
+                select(
+                    .type == "assistant" and
+                    .message.id != null and
+                    .timestamp >= $today_utc and
+                    .timestamp < $tomorrow_utc
+                ) |
+                [.timestamp,
+                 .message.id,
+                 (.message.model // ""),
+                 (.message.usage.input_tokens // 0),
+                 (.message.usage.cache_creation_input_tokens // 0),
+                 (.message.usage.cache_read_input_tokens // 0),
+                 (.message.usage.output_tokens // 0)] | @tsv
+            ' 2>/dev/null | \
+            sort -t"	" -k1,1 | awk -F"	" '
+                function cost(model, inp, cc, cr, out) {
+                    if (model ~ /opus-4/)
+                        return (inp/1e6)*15 + (cc/1e6)*18.75 + (cr/1e6)*1.5 + (out/1e6)*75
+                    else if (model ~ /haiku/)
+                        return (inp/1e6)*1 + (cc/1e6)*1.25 + (cr/1e6)*0.1 + (out/1e6)*5
+                    else
+                        return (inp/1e6)*3 + (cc/1e6)*3.75 + (cr/1e6)*0.3 + (out/1e6)*15
+                }
+                !seen[$2]++ { total += cost($3, $4, $5, $6, $7) }
+                END { printf "%.3f", total+0 }
+            ')
+        NOW_TS=$(date +%s)
+        printf '{"date":"%s","total":%s,"computed_at":%s}\n' \
+            "$TODAY_DATE" "${TODAY_TOTAL_RAW:-0}" "$NOW_TS" > "$TODAY_CACHE"
+    fi
 
-    # Read today's total
-    TODAY_TOTAL_RAW=$(jq -r --arg today "$TODAY_DATE" '.daily[$today] // 0' "$USAGE_LOG" 2>/dev/null || echo "0")
-    TODAY_TOTAL=$(echo "$TODAY_TOTAL_RAW" | awk '{printf "%.3f", $1}')
+    TODAY_TOTAL=$(printf "%.3f" "${TODAY_TOTAL_RAW:-0}")
 
     COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
