@@ -28,6 +28,9 @@ if command git rev-parse --git-dir > /dev/null 2>&1; then
     fi
 fi
 
+# Resolve Claude config directory (respects CLAUDE_CONFIG_DIR env var)
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
 # Calculate context usage, tokens, and cost
 METRICS=""
 MODEL_ID=$(echo "$input" | jq -r '.model.id')
@@ -104,7 +107,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     # Calculate session cost from JSONL (includes all token types: input, cache_write, cache_read, output)
     SESSION_ID=$(echo "$input" | jq -r '.session_id // "unknown"')
-    SESSION_JSONL=$(find "$HOME/.claude/projects" -name "${SESSION_ID}.jsonl" 2>/dev/null | head -1)
+    SESSION_JSONL=$(find "$CLAUDE_DIR/projects" -name "${SESSION_ID}.jsonl" 2>/dev/null | head -1)
     if [ -n "$SESSION_JSONL" ]; then
         TOTAL_COST=$(jq -r '
             select(.type == "assistant" and .message.id != null) |
@@ -147,7 +150,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     # Calculate today's total cost by scanning JSONL files (same source as ccusage)
     TODAY_DATE=$(date +%Y-%m-%d)
-    TODAY_CACHE="$HOME/.claude/usage-today-cache.json"
+    TODAY_CACHE="$CLAUDE_DIR/usage-today-cache.json"
     CACHE_AGE=60  # seconds TTL
 
     # Compute UTC start/end of local "today" for correct timezone-aware filtering
@@ -174,7 +177,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     if [ "$CACHE_VALID" = "1" ]; then
         TODAY_TOTAL_RAW=$(jq -r '.total' "$TODAY_CACHE" 2>/dev/null)
     else
-        TODAY_TOTAL_RAW=$(find "$HOME/.claude/projects" -name "*.jsonl" -print0 2>/dev/null | \
+        TODAY_TOTAL_RAW=$(find "$CLAUDE_DIR/projects" -name "*.jsonl" -print0 2>/dev/null | \
             xargs -0 jq -r --arg today_utc "$TODAY_UTC" --arg tomorrow_utc "$TOMORROW_UTC" '
                 select(
                     .type == "assistant" and
