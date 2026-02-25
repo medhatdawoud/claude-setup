@@ -13,7 +13,8 @@ This repository contains my personal Claude Code configuration, including system
   - tech-researcher.md
 - **journal/** - Historical session summaries
 - **skills/** - Skill definitions (contains symlink to external .agents directory)
-- **hooks/rtk-rewrite.sh** - PreToolUse hook that transparently rewrites commands to rtk equivalents
+- **hooks/** - Claude Code hook scripts:
+  - `rtk-rewrite.sh` - PreToolUse hook that transparently rewrites commands to rtk equivalents
 - **setup.sh** - Automated setup script for new machines
 - **claude_desktop_config.example.json** - MCP server configuration template
 
@@ -160,6 +161,8 @@ These directories contain session-specific or temporary data:
 ├── README.md                      # This file
 ├── .gitignore                     # Exclusions
 ├── claude_desktop_config.example.json  # MCP template
+├── hooks/                         # Claude Code hooks
+│   └── rtk-rewrite.sh             # PreToolUse Bash command rewriter
 ├── agents/                        # Custom agents
 │   ├── code-review-specialist.md
 │   ├── react-frontend-builder.md

@@ -55,6 +55,9 @@ ln -sf "$REPO_DIR/journal" "$CLAUDE_DIR/journal"
 backup_if_exists "$CLAUDE_DIR/skills"
 ln -sf "$REPO_DIR/skills" "$CLAUDE_DIR/skills"
 
+backup_if_exists "$CLAUDE_DIR/hooks"
+ln -sf "$REPO_DIR/hooks" "$CLAUDE_DIR/hooks"
+
 # Merge statusLine and SubagentStop hook into settings.json (idempotent, preserves other keys)
 echo ""
 echo "Updating settings.json..."
