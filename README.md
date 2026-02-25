@@ -13,10 +13,18 @@ This repository contains my personal Claude Code configuration, including system
   - tech-researcher.md
 - **journal/** - Historical session summaries
 - **skills/** - Skill definitions (contains symlink to external .agents directory)
+- **hooks/rtk-rewrite.sh** - PreToolUse hook that transparently rewrites commands to rtk equivalents
 - **setup.sh** - Automated setup script for new machines
 - **claude_desktop_config.example.json** - MCP server configuration template
 
 ## Prerequisites
+
+### Required Tools
+
+- **jq** - JSON processor (checked by setup.sh): `brew install jq`
+- **rtk** - Token-optimizing CLI proxy (installed automatically by setup.sh): `brew install rtk`
+  - Powers the statusline savings display (`rtk gain`)
+  - Auto-rewrites commands via the `PreToolUse` hook in `hooks/rtk-rewrite.sh`
 
 ### External Dependencies
 
