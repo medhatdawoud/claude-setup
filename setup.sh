@@ -16,6 +16,12 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 
+# Install rtk if not present
+if ! command -v rtk &>/dev/null; then
+    echo "Installing rtk..."
+    brew install rtk
+fi
+
 # Create .claude directory if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
 
