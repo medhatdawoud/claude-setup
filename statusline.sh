@@ -71,8 +71,14 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     CONTEXT_INFO=$(printf '%b%s\033[90m%s\033[0m' "$BAR_COLOR" "$BAR_FILLED" "$BAR_EMPTY")
 
     # Calculate session cost based on model pricing
-    # Pricing per million tokens (as of Jan 2025)
+    # Pricing per million tokens
     case "$MODEL_ID" in
+        *"opus-4-5"*|*"opus-4-6"*)
+            INPUT_COST_PER_M=5.00
+            OUTPUT_COST_PER_M=25.00
+            CACHE_WRITE_COST_PER_M=6.25
+            CACHE_READ_COST_PER_M=0.50
+            ;;
         *"opus-4"*)
             INPUT_COST_PER_M=15.00
             OUTPUT_COST_PER_M=75.00
@@ -121,7 +127,9 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         ' "$SESSION_JSONL" 2>/dev/null | \
         sort -t"	" -k1,1 | awk -F"	" '
             function cost(model, inp, cc, cr, out) {
-                if (model ~ /opus-4/)
+                if (model ~ /opus-4-[56]/)
+                    return (inp/1e6)*5 + (cc/1e6)*6.25 + (cr/1e6)*0.5 + (out/1e6)*25
+                else if (model ~ /opus-4/)
                     return (inp/1e6)*15 + (cc/1e6)*18.75 + (cr/1e6)*1.5 + (out/1e6)*75
                 else if (model ~ /haiku/)
                     return (inp/1e6)*1 + (cc/1e6)*1.25 + (cr/1e6)*0.1 + (out/1e6)*5
@@ -195,7 +203,9 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
             ' 2>/dev/null | \
             sort -t"	" -k1,1 | awk -F"	" '
                 function cost(model, inp, cc, cr, out) {
-                    if (model ~ /opus-4/)
+                    if (model ~ /opus-4-[56]/)
+                        return (inp/1e6)*5 + (cc/1e6)*6.25 + (cr/1e6)*0.5 + (out/1e6)*25
+                    else if (model ~ /opus-4/)
                         return (inp/1e6)*15 + (cc/1e6)*18.75 + (cr/1e6)*1.5 + (out/1e6)*75
                     else if (model ~ /haiku/)
                         return (inp/1e6)*1 + (cc/1e6)*1.25 + (cr/1e6)*0.1 + (out/1e6)*5
