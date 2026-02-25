@@ -242,9 +242,9 @@ fi
 
 # Append rtk gain savings
 if command -v rtk &>/dev/null; then
-    RTK_SAVINGS=$(rtk gain 2>/dev/null | grep -oE '\$[0-9]+\.[0-9]+' | head -1)
-    RTK_SAVINGS="${RTK_SAVINGS:-\$0.00}"
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 💾 \033[32m%s\033[0m \033[90m(rtk gain)\033[0m' "$RTK_SAVINGS")"
+    RTK_SAVINGS=$(rtk gain 2>/dev/null | grep "Tokens saved:" | grep -oE '[0-9,]+ \([0-9.]+%\)' | head -1)
+    RTK_SAVINGS="${RTK_SAVINGS:-0 (0%)}"
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 💾 \033[32m%s\033[0m \033[90m(rtk)\033[0m' "$RTK_SAVINGS")"
 fi
 
 printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
