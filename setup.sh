@@ -65,7 +65,20 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 [ ! -f "$SETTINGS" ] && echo '{}' > "$SETTINGS"
 jq --arg dir "$CLAUDE_DIR" '
     .statusLine = {"type": "command", "command": ("bash " + $dir + "/statusline.sh")} |
-    .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/subagent-cost-hook.sh")}]}]
+    .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/subagent-cost-hook.sh")}]}] |
+    .permissions.deny = [
+        "Read(**/.env)",
+        "Read(**/.env.*)",
+        "Read(**/secrets/**)",
+        "Read(**/credentials*)",
+        "Read(**/*.pem)",
+        "Read(**/*.key)",
+        "Read(**/*.p12)",
+        "Read(**/*.pfx)",
+        "Read(~/.ssh/**)",
+        "Read(~/.aws/credentials)",
+        "Read(~/.aws/config)"
+    ]
 ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
 
 # Setup MCP config (if example exists and user wants to copy)
