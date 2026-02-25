@@ -66,6 +66,7 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 jq --arg dir "$CLAUDE_DIR" '
     .statusLine = {"type": "command", "command": ("bash " + $dir + "/statusline.sh")} |
     .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/subagent-cost-hook.sh")}]}] |
+    .hooks.Stop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/hooks/bell-on-stop.sh")}]}] |
     .permissions.deny = [
         "Read(**/.env)",
         "Read(**/.env.*)",
