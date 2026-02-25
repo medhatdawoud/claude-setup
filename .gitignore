@@ -18,9 +18,6 @@ plugins/
 cache/
 file-history/
 
-# User-specific configs
-settings.json
-
 # Analytics/telemetry
 stats-cache.json
 statsig/
