@@ -35,28 +35,32 @@ backup_if_exists() {
     fi
 }
 
-# Symlink files
-echo "Creating symlinks..."
-backup_if_exists "$CLAUDE_DIR/CLAUDE.md"
-ln -sf "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
+# Symlink files (skip if repo is already the .claude dir — symlinks would be self-referential)
+if [ "$REPO_DIR" = "$CLAUDE_DIR" ]; then
+    echo "Repo is already the Claude config dir — skipping symlinks (files are already in place)."
+else
+    echo "Creating symlinks..."
+    backup_if_exists "$CLAUDE_DIR/CLAUDE.md"
+    ln -sf "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
 
-backup_if_exists "$CLAUDE_DIR/statusline.sh"
-ln -sf "$REPO_DIR/statusline.sh" "$CLAUDE_DIR/statusline.sh"
+    backup_if_exists "$CLAUDE_DIR/statusline.sh"
+    ln -sf "$REPO_DIR/statusline.sh" "$CLAUDE_DIR/statusline.sh"
 
-backup_if_exists "$CLAUDE_DIR/subagent-cost-hook.sh"
-ln -sf "$REPO_DIR/subagent-cost-hook.sh" "$CLAUDE_DIR/subagent-cost-hook.sh"
+    backup_if_exists "$CLAUDE_DIR/subagent-cost-hook.sh"
+    ln -sf "$REPO_DIR/subagent-cost-hook.sh" "$CLAUDE_DIR/subagent-cost-hook.sh"
 
-backup_if_exists "$CLAUDE_DIR/agents"
-ln -sf "$REPO_DIR/agents" "$CLAUDE_DIR/agents"
+    backup_if_exists "$CLAUDE_DIR/agents"
+    ln -sf "$REPO_DIR/agents" "$CLAUDE_DIR/agents"
 
-backup_if_exists "$CLAUDE_DIR/journal"
-ln -sf "$REPO_DIR/journal" "$CLAUDE_DIR/journal"
+    backup_if_exists "$CLAUDE_DIR/journal"
+    ln -sf "$REPO_DIR/journal" "$CLAUDE_DIR/journal"
 
-backup_if_exists "$CLAUDE_DIR/skills"
-ln -sf "$REPO_DIR/skills" "$CLAUDE_DIR/skills"
+    backup_if_exists "$CLAUDE_DIR/skills"
+    ln -sf "$REPO_DIR/skills" "$CLAUDE_DIR/skills"
 
-backup_if_exists "$CLAUDE_DIR/hooks"
-ln -sf "$REPO_DIR/hooks" "$CLAUDE_DIR/hooks"
+    backup_if_exists "$CLAUDE_DIR/hooks"
+    ln -sf "$REPO_DIR/hooks" "$CLAUDE_DIR/hooks"
+fi
 
 # Merge statusLine and SubagentStop hook into settings.json (idempotent, preserves other keys)
 echo ""
