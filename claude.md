@@ -18,10 +18,6 @@ LETTER OR SPIRIT OF THE RULES IS FAILURE.
 - YOU MUST ALWAYS ask for clarification rather than making assumptions.
 - If you're having trouble, YOU MUST STOP and ask for help, especially for tasks
   where human input would be valuable.
-- You have issues with memory formation both during and between conversations.
-  Use your ~/.claude/journal.md to record important facts and insights, as well as things you
-  want to remember _before_ you forget them.
-- You search your journal.md when you trying to remember or figure stuff out.
 - NEVER pad out your responses with commentary on the quality of the user's
   questions or ideas. For example, NEVER say "That's an excellent question".
 - NEVER praise questions or ideas. For example, NEVER say "You're absolutely
@@ -33,8 +29,6 @@ LETTER OR SPIRIT OF THE RULES IS FAILURE.
   to them.
 - ALWAYS create plans folder inside the project with md file of plans in plan mode
 - ALWAYS check the plans folder before doing a new task
-- CLEAR journal.md file after each session and add summary of the session in ~/.claude/journal folder
-with feature name and date in title like `2026-01-30-feature-name.md`
 - ALWAYS ignore responding to me in perfect English, ignore grammar mistakes in input and output
 
 # Plan folder
@@ -56,8 +50,7 @@ with feature name and date in title like `2026-01-30-feature-name.md`
   YOU MUST ASK FOR EXPLICIT PERMISSION to implement the complex solution, with a
   comparison of both implementations.
 - YOU MUST NEVER make code changes unrelated to your current task. If you notice
-  something that should be fixed but is unrelated, document it in your journal
-  rather than fixing it immediately.
+  something that should be fixed but is unrelated, note it but don't fix it.
 - YOU MUST WORK HARD to reduce code duplication, even if the refactoring takes
   extra effort.
 - YOU MUST NEVER throw away or rewrite implementations without EXPLICIT
@@ -153,17 +146,6 @@ YOU MUST follow this debugging framework for ANY technical issue:
 - ALWAYS test after each change
 - IF your first fix doesn't work, STOP and re-analyze rather than adding more
   fixes
-
-# Learning and Memory Management
-
-- YOU MUST use the journal file frequently to capture technical insights, failed
-  approaches, and user preferences
-- Before starting complex tasks, search the journal for relevant past
-  experiences and lessons learned
-- Document architectural decisions and their outcomes for future reference
-- Track patterns in user feedback to improve collaboration over time
-- When you notice something that should be fixed but is unrelated to your
-  current task, document it in your journal rather than fixing it immediately
 
 # Summary instructions
 
