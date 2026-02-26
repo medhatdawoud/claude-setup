@@ -241,7 +241,7 @@ if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
 fi
 
 # Append rtk gain savings
-RTK_GAIN_OUTPUT=$(/Users/medhatdawoud/.local/bin/rtk gain 2>/dev/null)
+RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
 RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
 RTK_PCT=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:.*\(([0-9.]+%)\)' | grep -oE '[0-9.]+%')
 if [ -n "$RTK_SAVED" ] && [ -n "$RTK_PCT" ]; then
