@@ -69,6 +69,7 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 [ ! -f "$SETTINGS" ] && echo '{}' > "$SETTINGS"
 jq --arg dir "$CLAUDE_DIR" '
     .statusLine = {"type": "command", "command": ("bash " + $dir + "/statusline.sh")} |
+    .hooks.PreToolUse = [{"matcher": "Bash", "hooks": [{"type": "command", "command": ("bash " + $dir + "/hooks/rtk-rewrite.sh")}]}] |
     .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/subagent-cost-hook.sh")}]}] |
     .hooks.Stop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/hooks/bell-on-stop.sh")}]}] |
     .permissions.deny = [
