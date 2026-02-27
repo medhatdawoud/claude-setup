@@ -1,20 +1,29 @@
-# RTK
+# RTK - Rust Token Killer
 
-RTK is a token-optimizing CLI proxy that wraps common commands to reduce token usage and track costs.
+**Usage**: Token-optimized CLI proxy (60-90% savings on dev operations)
 
-## How it works
+## Meta Commands (always use rtk directly)
 
-A `PreToolUse:Bash` hook transparently rewrites commands to their `rtk` equivalents before execution. You do NOT need to manually prefix commands with `rtk` — the hook handles this automatically.
+```bash
+rtk gain              # Show token savings analytics
+rtk gain --history    # Show command usage history with savings
+rtk discover          # Analyze Claude Code history for missed opportunities
+rtk proxy <cmd>       # Execute raw command without filtering (for debugging)
+```
 
-Commands covered: `git`, `gh`, `cargo`, `cat`, `grep`, `rg`, `ls`, `tree`, `find`, `diff`, `head`, `vitest`, `tsc`, `eslint`, `prettier`, `playwright`, `prisma`, `docker`, `kubectl`, `curl`, `wget`, `pnpm`, `pytest`, `ruff`, `pip`, `go`, and more.
+## Installation Verification
 
-Unrecognized commands fall back to `rtk proxy <cmd>` for tracking.
+```bash
+rtk --version         # Should show: rtk X.Y.Z
+rtk gain              # Should work (not "command not found")
+which rtk             # Verify correct binary
+```
 
-## Statusline
+⚠️ **Name collision**: If `rtk gain` fails, you may have reachingforthejack/rtk (Rust Type Kit) installed instead.
 
-Token savings are displayed in the statusline via `rtk gain`.
+## Hook-Based Usage
 
-## Notes
+All other commands are automatically rewritten by the Claude Code hook.
+Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
 
-- If `rtk` is not installed, the hook exits silently and commands run normally
-- Never manually prefix commands with `rtk` — the hook does it
+Refer to CLAUDE.md for full command reference.

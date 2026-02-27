@@ -22,6 +22,10 @@ if ! command -v rtk &>/dev/null; then
     brew install rtk
 fi
 
+# Initialize rtk (idempotent — safe to run on existing installs)
+echo "Initializing rtk..."
+rtk init -g --auto-patch
+
 # Create .claude directory if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
 

@@ -187,9 +187,9 @@ elif echo "$MATCH_CMD" | grep -qE '^golangci-lint([[:space:]]|$)'; then
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^golangci-lint/rtk golangci-lint/')"
 fi
 
-# Fall back to rtk proxy for unrecognized commands (tracks usage, no filtering)
+# If no rewrite needed, approve as-is
 if [ -z "$REWRITTEN" ]; then
-  REWRITTEN="${ENV_PREFIX}rtk proxy $CMD_BODY"
+  exit 0
 fi
 
 # Build the updated tool_input with all original fields preserved, only command changed
