@@ -184,8 +184,9 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     if [ "$CACHE_VALID" = "1" ]; then
         TODAY_TOTAL_RAW=$(jq -r '.total' "$TODAY_CACHE" 2>/dev/null)
+        TODAY_TOKENS_RAW=$(jq -r '.tokens // 0' "$TODAY_CACHE" 2>/dev/null)
     else
-        TODAY_TOTAL_RAW=$(find "$CLAUDE_DIR/projects" -name "*.jsonl" -print0 2>/dev/null | \
+        TODAY_SCAN_RAW=$(find "$CLAUDE_DIR/projects" -name "*.jsonl" -print0 2>/dev/null | \
             xargs -0 jq -r --arg today_utc "$TODAY_UTC" --arg tomorrow_utc "$TOMORROW_UTC" '
                 select(
                     .type == "assistant" and
@@ -212,27 +213,40 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
                     else
                         return (inp/1e6)*3 + (cc/1e6)*3.75 + (cr/1e6)*0.3 + (out/1e6)*15
                 }
-                !seen[$2]++ { total += cost($3, $4, $5, $6, $7) }
-                END { printf "%.3f", total+0 }
+                !seen[$2]++ { total += cost($3, $4, $5, $6, $7); tokens += $4+$5+$6+$7 }
+                END { printf "%.3f\t%d", total+0, tokens+0 }
             ')
+        TODAY_TOTAL_RAW=$(printf '%s' "$TODAY_SCAN_RAW" | cut -f1)
+        TODAY_TOKENS_RAW=$(printf '%s' "$TODAY_SCAN_RAW" | cut -f2)
         NOW_TS=$(date +%s)
-        printf '{"date":"%s","total":%s,"computed_at":%s}\n' \
-            "$TODAY_DATE" "${TODAY_TOTAL_RAW:-0}" "$NOW_TS" > "$TODAY_CACHE"
+        printf '{"date":"%s","total":%s,"tokens":%s,"computed_at":%s}\n' \
+            "$TODAY_DATE" "${TODAY_TOTAL_RAW:-0}" "${TODAY_TOKENS_RAW:-0}" "$NOW_TS" > "$TODAY_CACHE"
     fi
 
     TODAY_TOTAL=$(printf "%.3f" "${TODAY_TOTAL_RAW:-0}")
 
-    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(today: $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
+    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(🗓️ $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
     # Build git status with diff stats and tokens
-    TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m' "$TOKEN_DISPLAY")"
+    if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
+        if [ "$TODAY_TOKENS_RAW" -ge 1000000 ]; then
+            TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fM", $1/1000000}')
+        elif [ "$TODAY_TOKENS_RAW" -ge 1000 ]; then
+            TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fK", $1/1000}')
+        else
+            TODAY_TOKEN_DISPLAY="$TODAY_TOKENS_RAW"
+        fi
+        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m \033[37m(🗓️ %s)\033[0m' "$TOKEN_DISPLAY" "$TODAY_TOKEN_DISPLAY")"
+    else
+        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m' "$TOKEN_DISPLAY")"
+    fi
     if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
         GIT_STATUS="${GIT_BRANCH_BASE}${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')${TOKEN_PART}"
     else
         GIT_STATUS="${GIT_BRANCH_BASE}${TOKEN_PART}"
     fi
 
-    METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s \033[90m|\033[0m 💵 %s' "$CONTEXT_PCT" "$CONTEXT_INFO" "$COST_DISPLAY")
+    METRICS=$(printf ' \033[90m|\033[0m 💵 %s \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$COST_DISPLAY" "$CONTEXT_PCT" "$CONTEXT_INFO")
 fi
 
 # Append model name at the end
