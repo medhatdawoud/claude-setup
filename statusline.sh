@@ -225,33 +225,20 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     TODAY_TOTAL=$(printf "%.3f" "${TODAY_TOTAL_RAW:-0}")
 
-    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(📆 $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
-
-    # Build git status with diff stats and tokens
-    if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
-        if [ "$TODAY_TOKENS_RAW" -ge 1000000 ]; then
-            TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fM", $1/1000000}')
-        elif [ "$TODAY_TOKENS_RAW" -ge 1000 ]; then
-            TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fK", $1/1000}')
-        else
-            TODAY_TOKEN_DISPLAY="$TODAY_TOKENS_RAW"
-        fi
-        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m \033[37m(📆 %s)\033[0m' "$TOKEN_DISPLAY" "$TODAY_TOKEN_DISPLAY")"
-    else
-        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m' "$TOKEN_DISPLAY")"
-    fi
+    # Build git status with session tokens and cost
+    TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m 💰 \033[32m$%s\033[0m' "$TOKEN_DISPLAY" "$TOTAL_COST")"
     if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
         GIT_STATUS="${GIT_BRANCH_BASE}${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')${TOKEN_PART}"
     else
         GIT_STATUS="${GIT_BRANCH_BASE}${TOKEN_PART}"
     fi
 
-    METRICS=$(printf ' \033[90m|\033[0m 💵 %s \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$COST_DISPLAY" "$CONTEXT_PCT" "$CONTEXT_INFO")
+    METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")
 fi
 
-# Append model name at the end
+# Prepend model name as first section after branch
 if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
+    METRICS="$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")${METRICS}"
 fi
 
 # Append rtk gain savings
@@ -259,9 +246,21 @@ RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
 RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
 RTK_PCT=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:.*\(([0-9.]+%)\)' | grep -oE '[0-9.]+%')
 if [ -n "$RTK_SAVED" ] && [ -n "$RTK_PCT" ]; then
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[32m%s (%s)\033[0m \033[90m(rtk)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[32m%s (%s)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
 else
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[90m0 (rtk)\033[0m')"
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[90m0\033[0m')"
+fi
+
+# Append today's stats at the end
+if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
+    if [ "$TODAY_TOKENS_RAW" -ge 1000000 ]; then
+        TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fM", $1/1000000}')
+    elif [ "$TODAY_TOKENS_RAW" -ge 1000 ]; then
+        TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fK", $1/1000}')
+    else
+        TODAY_TOKEN_DISPLAY="$TODAY_TOKENS_RAW"
+    fi
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m Today: \033[37m(🔸 \033[33m%s\033[0m 💰 \033[32m$%s\033[37m)\033[0m' "$TODAY_TOKEN_DISPLAY" "$TODAY_TOTAL")"
 fi
 
 printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
