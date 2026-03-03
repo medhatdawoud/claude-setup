@@ -236,11 +236,6 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")
 fi
 
-# Prepend model name as first section after branch
-if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
-    METRICS="$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")${METRICS}"
-fi
-
 # Append rtk gain savings
 RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
 RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
@@ -249,6 +244,11 @@ if [ -n "$RTK_SAVED" ] && [ -n "$RTK_PCT" ]; then
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[32m%s (%s)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
 else
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[90m0\033[0m')"
+fi
+
+# Append model name before today section
+if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
 fi
 
 # Append today's stats at the end
