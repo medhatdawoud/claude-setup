@@ -225,7 +225,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     TODAY_TOTAL=$(printf "%.3f" "${TODAY_TOTAL_RAW:-0}")
 
-    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(🗓️ $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
+    COST_DISPLAY=$(printf '\033[32m$%s\033[0m \033[37m(📆 $%s)\033[0m' "$TOTAL_COST" "$TODAY_TOTAL")
 
     # Build git status with diff stats and tokens
     if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
@@ -236,7 +236,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         else
             TODAY_TOKEN_DISPLAY="$TODAY_TOKENS_RAW"
         fi
-        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m \033[37m(🗓️ %s)\033[0m' "$TOKEN_DISPLAY" "$TODAY_TOKEN_DISPLAY")"
+        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m \033[37m(📆 %s)\033[0m' "$TOKEN_DISPLAY" "$TODAY_TOKEN_DISPLAY")"
     else
         TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m' "$TOKEN_DISPLAY")"
     fi
