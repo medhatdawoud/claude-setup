@@ -259,9 +259,9 @@ RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
 RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
 RTK_PCT=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:.*\(([0-9.]+%)\)' | grep -oE '[0-9.]+%')
 if [ -n "$RTK_SAVED" ] && [ -n "$RTK_PCT" ]; then
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 💾 \033[32m%s (%s)\033[0m \033[90m(rtk)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[32m%s (%s)\033[0m \033[90m(rtk)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
 else
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 💾 \033[90m0 (rtk)\033[0m')"
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[90m0 (rtk)\033[0m')"
 fi
 
 printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
