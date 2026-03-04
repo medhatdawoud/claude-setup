@@ -50,9 +50,6 @@ else
     backup_if_exists "$CLAUDE_DIR/statusline.sh"
     ln -sf "$REPO_DIR/statusline.sh" "$CLAUDE_DIR/statusline.sh"
 
-    backup_if_exists "$CLAUDE_DIR/subagent-cost-hook.sh"
-    ln -sf "$REPO_DIR/subagent-cost-hook.sh" "$CLAUDE_DIR/subagent-cost-hook.sh"
-
     backup_if_exists "$CLAUDE_DIR/agents"
     ln -sf "$REPO_DIR/agents" "$CLAUDE_DIR/agents"
 
@@ -66,7 +63,7 @@ else
     ln -sf "$REPO_DIR/hooks" "$CLAUDE_DIR/hooks"
 fi
 
-# Merge statusLine and SubagentStop hook into settings.json (idempotent, preserves other keys)
+# Merge statusLine and hooks into settings.json (idempotent, preserves other keys)
 echo ""
 echo "Updating settings.json..."
 SETTINGS="$CLAUDE_DIR/settings.json"
@@ -74,7 +71,6 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 jq --arg dir "$CLAUDE_DIR" '
     .statusLine = {"type": "command", "command": ("bash " + $dir + "/statusline.sh")} |
     .hooks.PreToolUse = [{"matcher": "Bash", "hooks": [{"type": "command", "command": ("bash " + $dir + "/hooks/rtk-rewrite.sh")}]}] |
-    .hooks.SubagentStop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/subagent-cost-hook.sh")}]}] |
     .hooks.Stop = [{"hooks": [{"type": "command", "command": ("bash " + $dir + "/hooks/bell-on-stop.sh")}]}] |
     .permissions.deny = [
         "Read(**/.env)",
