@@ -1,6 +1,12 @@
 #!/bin/bash
 input=$(cat)
 
+# Resolve Claude config directory (respects CLAUDE_CONFIG_DIR env var)
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
+# Source user config if present (overrides section defaults)
+[ -f "$CLAUDE_DIR/statusline.conf" ] && source "$CLAUDE_DIR/statusline.conf"
+
 DIR=$(echo "$input" | jq -r '.workspace.current_dir')
 DIR_NAME=$(basename "$DIR")
 
@@ -27,12 +33,6 @@ if [ "${STATUSLINE_GIT:-0}" = "1" ] && command git rev-parse --git-dir > /dev/nu
         GIT_BRANCH_BASE="$(printf ' \033[90m/\033[0m \033[32m🌿 \033[37m%s\033[0m' "$BRANCH")"
     fi
 fi
-
-# Resolve Claude config directory (respects CLAUDE_CONFIG_DIR env var)
-CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-
-# Source user config if present (overrides section defaults)
-[ -f "$CLAUDE_DIR/statusline.conf" ] && source "$CLAUDE_DIR/statusline.conf"
 
 # Calculate context usage, tokens, and cost
 METRICS=""
@@ -82,38 +82,22 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         *"opus-4-5"*|*"opus-4-6"*)
             INPUT_COST_PER_M=5.00
             OUTPUT_COST_PER_M=25.00
-            CACHE_WRITE_COST_PER_M=6.25
-            CACHE_READ_COST_PER_M=0.50
             ;;
         *"opus-4"*)
             INPUT_COST_PER_M=15.00
             OUTPUT_COST_PER_M=75.00
-            CACHE_WRITE_COST_PER_M=18.75
-            CACHE_READ_COST_PER_M=1.50
             ;;
-        *"sonnet-4"*)
+        *"sonnet-4"*|*"sonnet"*|*"claude-3-5"*)
             INPUT_COST_PER_M=3.00
             OUTPUT_COST_PER_M=15.00
-            CACHE_WRITE_COST_PER_M=3.75
-            CACHE_READ_COST_PER_M=0.30
-            ;;
-        *"sonnet"*|*"claude-3-5"*)
-            INPUT_COST_PER_M=3.00
-            OUTPUT_COST_PER_M=15.00
-            CACHE_WRITE_COST_PER_M=3.75
-            CACHE_READ_COST_PER_M=0.30
             ;;
         *"haiku"*)
             INPUT_COST_PER_M=1.00
             OUTPUT_COST_PER_M=5.00
-            CACHE_WRITE_COST_PER_M=1.25
-            CACHE_READ_COST_PER_M=0.10
             ;;
         *)
             INPUT_COST_PER_M=3.00
             OUTPUT_COST_PER_M=15.00
-            CACHE_WRITE_COST_PER_M=3.75
-            CACHE_READ_COST_PER_M=0.30
             ;;
     esac
 
@@ -263,6 +247,39 @@ if [ "${STATUSLINE_RTK:-0}" = "1" ]; then
     fi
 fi
 
+# Append session time
+if [ "${STATUSLINE_SESSION_TIME:-0}" = "1" ]; then
+    SESSION_ID="${SESSION_ID:-$(echo "$input" | jq -r '.session_id // "unknown"')}"
+    SESSION_JSONL=$(find "$CLAUDE_DIR/projects" -name "${SESSION_ID}.jsonl" 2>/dev/null | head -1)
+    if [ -n "$SESSION_JSONL" ]; then
+        FIRST_TS=$(jq -r 'select(.timestamp != null) | .timestamp' "$SESSION_JSONL" 2>/dev/null | head -1)
+        FIRST_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${FIRST_TS%.*}" "+%s" 2>/dev/null || \
+                      date -d "$FIRST_TS" "+%s" 2>/dev/null)
+        ELAPSED=$(( $(date +%s) - FIRST_EPOCH ))
+        HOURS=$((ELAPSED / 3600)); MINS=$(( (ELAPSED % 3600) / 60 ))
+        [ $HOURS -gt 0 ] && SESSION_TIME="${HOURS}h ${MINS}m" || SESSION_TIME="${MINS}m"
+        METRICS="${METRICS}$(printf ' \033[90m|\033[0m ⏱️  \033[37m%s\033[0m' "$SESSION_TIME")"
+    fi
+fi
+
+# Append memory usage
+if [ "${STATUSLINE_MEM:-0}" = "1" ]; then
+    PAGE_SIZE=$(sysctl -n hw.pagesize 2>/dev/null)
+    TOTAL_MEM_BYTES=$(sysctl -n hw.memsize 2>/dev/null)
+    FREE_PAGES=$(vm_stat 2>/dev/null | awk '
+        /Pages free/ { gsub(/\./, "", $3); free=$3 }
+        /Pages speculative/ { gsub(/\./, "", $3); spec=$3 }
+        /Pages inactive/ { gsub(/\./, "", $3); inact=$3 }
+        END { print free+spec+inact }
+    ')
+    MEM_DISPLAY=$(echo "$TOTAL_MEM_BYTES $FREE_PAGES $PAGE_SIZE" | awk '{
+        total=$1/1024/1024/1024
+        free=$2*$3/1024/1024/1024
+        printf "%.1f/%.0fGB", total-free, total
+    }')
+    METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🔋 \033[37m%s\033[0m' "$MEM_DISPLAY")"
+fi
+
 # Append model name
 if [ "${STATUSLINE_MODEL:-0}" = "1" ] && [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
@@ -343,4 +360,6 @@ MONTH_TOTAL=$(printf "%.2f" "${MONTH_TOTAL_RAW:-0}")
 METRICS="${METRICS}$(printf ' \033[90m|\033[0m Month: \033[32m$%s\033[0m' "$MONTH_TOTAL")"
 fi # STATUSLINE_MONTH
 
-printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
+DIR_DISPLAY=""
+[ "${STATUSLINE_DIR:-0}" = "1" ] && DIR_DISPLAY="$(printf '\033[90m/\033[0m \033[36m%s\033[0m' "$DIR_NAME")"
+printf '%s%s%s' "$DIR_DISPLAY" "$GIT_STATUS" "$METRICS"

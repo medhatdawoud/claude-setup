@@ -85,13 +85,16 @@ ask_rtk() {
     fi
 }
 
-ask "git branch + diff"     STATUSLINE_GIT     "🌿 main +5 -2"
-ask "session tokens + cost" STATUSLINE_SESSION  "🔸 12.3K 💰 \$0.042"
-ask "context window bar"    STATUSLINE_CONTEXT  "23% ━━━─────────"
+ask "current directory"     STATUSLINE_DIR          "/ my-project"
+ask "git branch + diff"     STATUSLINE_GIT          "🌿 main +5 -2"
+ask "session tokens + cost" STATUSLINE_SESSION       "🔸 12.3K 💰 \$0.042"
+ask "context window bar"    STATUSLINE_CONTEXT       "23% ━━━─────────"
 ask_rtk
-ask "model name"            STATUSLINE_MODEL    "🧠 Sonnet 4.6"
-ask "today tokens + cost"   STATUSLINE_TODAY    "Today: (🔸 45.2K 💰 \$0.156)"
-ask "monthly cost"          STATUSLINE_MONTH    "Month: \$12.34"
+ask "session time"          STATUSLINE_SESSION_TIME  "⏱️ 42m"
+ask "memory usage"          STATUSLINE_MEM           "🔋 8.2/32GB"
+ask "model name"            STATUSLINE_MODEL         "🧠 Sonnet 4.6"
+ask "today tokens + cost"   STATUSLINE_TODAY         "Today: (🔸 45.2K 💰 \$0.156)"
+ask "monthly cost"          STATUSLINE_MONTH         "Month: \$12.34"
 
 echo ""
 echo "Config written to $CONF"
