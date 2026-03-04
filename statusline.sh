@@ -6,7 +6,7 @@ DIR_NAME=$(basename "$DIR")
 
 # Get git branch if in a git repo
 cd "$DIR" 2>/dev/null
-if [ "${STATUSLINE_GIT:-1}" = "1" ] && command git rev-parse --git-dir > /dev/null 2>&1; then
+if [ "${STATUSLINE_GIT:-0}" = "1" ] && command git rev-parse --git-dir > /dev/null 2>&1; then
     BRANCH=$(command git symbolic-ref --short HEAD 2>/dev/null || command git rev-parse --short HEAD 2>/dev/null)
     if [ -n "$BRANCH" ]; then
         # Get diff stats for uncommitted changes (staged + unstaged)
@@ -46,7 +46,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     WINDOW_SIZE=$(echo "$CONTEXT_WINDOW" | jq -r '.context_window_size')
     CURRENT_USAGE=$(echo "$CONTEXT_WINDOW" | jq '.current_usage')
 
-    if [ "${STATUSLINE_CONTEXT:-1}" = "1" ]; then
+    if [ "${STATUSLINE_CONTEXT:-0}" = "1" ]; then
         # Calculate current context as a thin progress bar (12 chars = ~8.3% per segment)
         BAR_WIDTH=12
         if [ "$CURRENT_USAGE" != "null" ]; then
@@ -75,7 +75,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         CONTEXT_INFO=$(printf '%b%s\033[90m%s\033[0m' "$BAR_COLOR" "$BAR_FILLED" "$BAR_EMPTY")
     fi
 
-    if [ "${STATUSLINE_SESSION:-1}" = "1" ]; then
+    if [ "${STATUSLINE_SESSION:-0}" = "1" ]; then
     # Calculate session cost based on model pricing
     # Pricing per million tokens
     case "$MODEL_ID" in
@@ -164,7 +164,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     fi # STATUSLINE_SESSION
 
-    if [ "${STATUSLINE_TODAY:-1}" = "1" ]; then
+    if [ "${STATUSLINE_TODAY:-0}" = "1" ]; then
     # Calculate today's total cost by scanning JSONL files (same source as ccusage)
     TODAY_DATE=$(date +%Y-%m-%d)
     TODAY_CACHE="$CLAUDE_DIR/usage-today-cache.json"
@@ -237,7 +237,7 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
 
     # Build git status with session tokens and cost
     TOKEN_PART=""
-    if [ "${STATUSLINE_SESSION:-1}" = "1" ]; then
+    if [ "${STATUSLINE_SESSION:-0}" = "1" ]; then
         TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m 💰 \033[32m$%s\033[0m' "$TOKEN_DISPLAY" "$TOTAL_COST")"
     fi
     if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
@@ -246,13 +246,13 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         GIT_STATUS="${GIT_BRANCH_BASE}${TOKEN_PART}"
     fi
 
-    if [ "${STATUSLINE_CONTEXT:-1}" = "1" ]; then
+    if [ "${STATUSLINE_CONTEXT:-0}" = "1" ]; then
         METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")
     fi
 fi
 
 # Append rtk gain savings
-if [ "${STATUSLINE_RTK:-1}" = "1" ]; then
+if [ "${STATUSLINE_RTK:-0}" = "1" ]; then
     RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
     RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
     RTK_PCT=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:.*\(([0-9.]+%)\)' | grep -oE '[0-9.]+%')
@@ -264,12 +264,12 @@ if [ "${STATUSLINE_RTK:-1}" = "1" ]; then
 fi
 
 # Append model name
-if [ "${STATUSLINE_MODEL:-1}" = "1" ] && [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
+if [ "${STATUSLINE_MODEL:-0}" = "1" ] && [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
 fi
 
 # Append today's stats at the end
-if [ "${STATUSLINE_TODAY:-1}" = "1" ] && [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
+if [ "${STATUSLINE_TODAY:-0}" = "1" ] && [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
     if [ "$TODAY_TOKENS_RAW" -ge 1000000 ]; then
         TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fM", $1/1000000}')
     elif [ "$TODAY_TOKENS_RAW" -ge 1000 ]; then
@@ -281,7 +281,7 @@ if [ "${STATUSLINE_TODAY:-1}" = "1" ] && [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/d
 fi
 
 # Calculate this month's total cost
-if [ "${STATUSLINE_MONTH:-1}" = "1" ]; then
+if [ "${STATUSLINE_MONTH:-0}" = "1" ]; then
 MONTH_KEY=$(date +%Y-%m)
 MONTH_CACHE="$CLAUDE_DIR/usage-month-cache.json"
 MONTH_CACHE_TTL=300
