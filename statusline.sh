@@ -6,7 +6,7 @@ DIR_NAME=$(basename "$DIR")
 
 # Get git branch if in a git repo
 cd "$DIR" 2>/dev/null
-if command git rev-parse --git-dir > /dev/null 2>&1; then
+if [ "${STATUSLINE_GIT:-1}" = "1" ] && command git rev-parse --git-dir > /dev/null 2>&1; then
     BRANCH=$(command git symbolic-ref --short HEAD 2>/dev/null || command git rev-parse --short HEAD 2>/dev/null)
     if [ -n "$BRANCH" ]; then
         # Get diff stats for uncommitted changes (staged + unstaged)
@@ -31,6 +31,9 @@ fi
 # Resolve Claude config directory (respects CLAUDE_CONFIG_DIR env var)
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
+# Source user config if present (overrides section defaults)
+[ -f "$CLAUDE_DIR/statusline.conf" ] && source "$CLAUDE_DIR/statusline.conf"
+
 # Calculate context usage, tokens, and cost
 METRICS=""
 MODEL_ID=$(echo "$input" | jq -r '.model.id')
@@ -43,33 +46,36 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     WINDOW_SIZE=$(echo "$CONTEXT_WINDOW" | jq -r '.context_window_size')
     CURRENT_USAGE=$(echo "$CONTEXT_WINDOW" | jq '.current_usage')
 
-    # Calculate current context as a thin progress bar (12 chars = ~8.3% per segment)
-    BAR_WIDTH=12
-    if [ "$CURRENT_USAGE" != "null" ]; then
-        INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens')
-        CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens')
-        CACHE_READ=$(echo "$CURRENT_USAGE" | jq -r '.cache_read_input_tokens')
-        CURRENT_CONTEXT=$((INPUT_TOKENS + CACHE_CREATE + CACHE_READ))
-        CONTEXT_PCT=$((CURRENT_CONTEXT * 100 / WINDOW_SIZE))
-        FILLED=$((CONTEXT_PCT * BAR_WIDTH / 100))
-    else
-        CONTEXT_PCT=0
-        FILLED=0
+    if [ "${STATUSLINE_CONTEXT:-1}" = "1" ]; then
+        # Calculate current context as a thin progress bar (12 chars = ~8.3% per segment)
+        BAR_WIDTH=12
+        if [ "$CURRENT_USAGE" != "null" ]; then
+            INPUT_TOKENS=$(echo "$CURRENT_USAGE" | jq -r '.input_tokens')
+            CACHE_CREATE=$(echo "$CURRENT_USAGE" | jq -r '.cache_creation_input_tokens')
+            CACHE_READ=$(echo "$CURRENT_USAGE" | jq -r '.cache_read_input_tokens')
+            CURRENT_CONTEXT=$((INPUT_TOKENS + CACHE_CREATE + CACHE_READ))
+            CONTEXT_PCT=$((CURRENT_CONTEXT * 100 / WINDOW_SIZE))
+            FILLED=$((CONTEXT_PCT * BAR_WIDTH / 100))
+        else
+            CONTEXT_PCT=0
+            FILLED=0
+        fi
+        EMPTY=$((BAR_WIDTH - FILLED))
+        BAR_FILLED=""
+        [ "$FILLED" -gt 0 ] && BAR_FILLED=$(printf '%0.s━' $(seq 1 $FILLED 2>/dev/null))
+        BAR_EMPTY=$(printf '%0.s─' $(seq 1 $EMPTY 2>/dev/null))
+        # Color: green <50%, yellow 50-79%, red 80%+
+        if [ "$CONTEXT_PCT" -ge 80 ]; then
+            BAR_COLOR='\033[31m'
+        elif [ "$CONTEXT_PCT" -ge 50 ]; then
+            BAR_COLOR='\033[33m'
+        else
+            BAR_COLOR='\033[32m'
+        fi
+        CONTEXT_INFO=$(printf '%b%s\033[90m%s\033[0m' "$BAR_COLOR" "$BAR_FILLED" "$BAR_EMPTY")
     fi
-    EMPTY=$((BAR_WIDTH - FILLED))
-    BAR_FILLED=""
-    [ "$FILLED" -gt 0 ] && BAR_FILLED=$(printf '%0.s━' $(seq 1 $FILLED 2>/dev/null))
-    BAR_EMPTY=$(printf '%0.s─' $(seq 1 $EMPTY 2>/dev/null))
-    # Color: green <50%, yellow 50-79%, red 80%+
-    if [ "$CONTEXT_PCT" -ge 80 ]; then
-        BAR_COLOR='\033[31m'
-    elif [ "$CONTEXT_PCT" -ge 50 ]; then
-        BAR_COLOR='\033[33m'
-    else
-        BAR_COLOR='\033[32m'
-    fi
-    CONTEXT_INFO=$(printf '%b%s\033[90m%s\033[0m' "$BAR_COLOR" "$BAR_FILLED" "$BAR_EMPTY")
 
+    if [ "${STATUSLINE_SESSION:-1}" = "1" ]; then
     # Calculate session cost based on model pricing
     # Pricing per million tokens
     case "$MODEL_ID" in
@@ -156,6 +162,9 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
         TOKEN_DISPLAY="$TOTAL_TOKENS"
     fi
 
+    fi # STATUSLINE_SESSION
+
+    if [ "${STATUSLINE_TODAY:-1}" = "1" ]; then
     # Calculate today's total cost by scanning JSONL files (same source as ccusage)
     TODAY_DATE=$(date +%Y-%m-%d)
     TODAY_CACHE="$CLAUDE_DIR/usage-today-cache.json"
@@ -224,35 +233,43 @@ if [ "$CONTEXT_WINDOW" != "null" ]; then
     fi
 
     TODAY_TOTAL=$(printf "%.3f" "${TODAY_TOTAL_RAW:-0}")
+    fi # STATUSLINE_TODAY
 
     # Build git status with session tokens and cost
-    TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m 💰 \033[32m$%s\033[0m' "$TOKEN_DISPLAY" "$TOTAL_COST")"
+    TOKEN_PART=""
+    if [ "${STATUSLINE_SESSION:-1}" = "1" ]; then
+        TOKEN_PART="$(printf ' \033[90m|\033[0m 🔸 \033[33m%s\033[0m 💰 \033[32m$%s\033[0m' "$TOKEN_DISPLAY" "$TOTAL_COST")"
+    fi
     if ! command git diff --quiet 2>/dev/null || ! command git diff --cached --quiet 2>/dev/null; then
         GIT_STATUS="${GIT_BRANCH_BASE}${DIFF_DISPLAY}$(printf ' \033[33m*\033[0m')${TOKEN_PART}"
     else
         GIT_STATUS="${GIT_BRANCH_BASE}${TOKEN_PART}"
     fi
 
-    METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")
+    if [ "${STATUSLINE_CONTEXT:-1}" = "1" ]; then
+        METRICS=$(printf ' \033[90m|\033[0m \033[35m%d%%\033[0m %s' "$CONTEXT_PCT" "$CONTEXT_INFO")
+    fi
 fi
 
 # Append rtk gain savings
-RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
-RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
-RTK_PCT=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:.*\(([0-9.]+%)\)' | grep -oE '[0-9.]+%')
-if [ -n "$RTK_SAVED" ] && [ -n "$RTK_PCT" ]; then
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[32m%s (%s)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
-else
-    METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[90m0\033[0m')"
+if [ "${STATUSLINE_RTK:-1}" = "1" ]; then
+    RTK_GAIN_OUTPUT=$(rtk gain 2>/dev/null)
+    RTK_SAVED=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:[[:space:]]+[0-9.]+[KMB]?' | grep -oE '[0-9.]+[KMB]?')
+    RTK_PCT=$(echo "$RTK_GAIN_OUTPUT" | grep -oE 'Tokens saved:.*\(([0-9.]+%)\)' | grep -oE '[0-9.]+%')
+    if [ -n "$RTK_SAVED" ] && [ -n "$RTK_PCT" ]; then
+        METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[32m%s (%s)\033[0m' "$RTK_SAVED" "$RTK_PCT")"
+    else
+        METRICS="${METRICS}$(printf ' \033[90m|\033[0m ✂️ \033[90m0\033[0m')"
+    fi
 fi
 
-# Append model name before today section
-if [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
+# Append model name
+if [ "${STATUSLINE_MODEL:-1}" = "1" ] && [ -n "$MODEL_NAME" ] && [ "$MODEL_NAME" != "null" ]; then
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m 🧠 \033[96m%s\033[0m' "$MODEL_NAME")"
 fi
 
 # Append today's stats at the end
-if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
+if [ "${STATUSLINE_TODAY:-1}" = "1" ] && [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
     if [ "$TODAY_TOKENS_RAW" -ge 1000000 ]; then
         TODAY_TOKEN_DISPLAY=$(echo "$TODAY_TOKENS_RAW" | awk '{printf "%.1fM", $1/1000000}')
     elif [ "$TODAY_TOKENS_RAW" -ge 1000 ]; then
@@ -264,6 +281,7 @@ if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
 fi
 
 # Calculate this month's total cost
+if [ "${STATUSLINE_MONTH:-1}" = "1" ]; then
 MONTH_KEY=$(date +%Y-%m)
 MONTH_CACHE="$CLAUDE_DIR/usage-month-cache.json"
 MONTH_CACHE_TTL=300
@@ -323,5 +341,6 @@ fi
 
 MONTH_TOTAL=$(printf "%.2f" "${MONTH_TOTAL_RAW:-0}")
 METRICS="${METRICS}$(printf ' \033[90m|\033[0m Month: \033[32m$%s\033[0m' "$MONTH_TOTAL")"
+fi # STATUSLINE_MONTH
 
 printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"

@@ -33,4 +33,25 @@ jq --arg dir "$CLAUDE_DIR" \
 echo "Updated settings.json: statusLine points to $CLAUDE_DIR/statusline.sh"
 
 echo ""
+echo "Configure statusline sections (Enter = yes, default all on):"
+
+ask() {
+    local label="$1" flag="$2"
+    read -r -p "  Include $label? [Y/n]: " ans
+    [[ "${ans:-y}" =~ ^[Yy] ]] && echo "${flag}=1" || echo "${flag}=0"
+}
+
+CONF="$CLAUDE_DIR/statusline.conf"
+{
+    ask "git branch + diff" STATUSLINE_GIT
+    ask "session tokens + cost" STATUSLINE_SESSION
+    ask "context window bar" STATUSLINE_CONTEXT
+    ask "RTK savings" STATUSLINE_RTK
+    ask "model name" STATUSLINE_MODEL
+    ask "today tokens + cost" STATUSLINE_TODAY
+    ask "monthly cost" STATUSLINE_MONTH
+} > "$CONF"
+
+echo "Config written to $CONF"
+echo ""
 echo "Status line setup complete. Restart Claude Code to apply."
