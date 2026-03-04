@@ -263,4 +263,65 @@ if [ "${TODAY_TOKENS_RAW:-0}" -gt 0 ] 2>/dev/null; then
     METRICS="${METRICS}$(printf ' \033[90m|\033[0m Today: \033[37m(🔸 \033[33m%s\033[0m 💰 \033[32m$%s\033[37m)\033[0m' "$TODAY_TOKEN_DISPLAY" "$TODAY_TOTAL")"
 fi
 
+# Calculate this month's total cost
+MONTH_KEY=$(date +%Y-%m)
+MONTH_CACHE="$CLAUDE_DIR/usage-month-cache.json"
+MONTH_CACHE_TTL=300
+
+MONTH_CACHE_VALID=0
+if [ -f "$MONTH_CACHE" ]; then
+    CACHE_MONTH=$(jq -r '.month // ""' "$MONTH_CACHE" 2>/dev/null)
+    CACHE_TS=$(jq -r '.computed_at // 0' "$MONTH_CACHE" 2>/dev/null)
+    NOW_MONTH_TS=$(date +%s)
+    if [ "$CACHE_MONTH" = "$MONTH_KEY" ] && [ $((NOW_MONTH_TS - CACHE_TS)) -lt $MONTH_CACHE_TTL ]; then
+        MONTH_CACHE_VALID=1
+    fi
+fi
+
+if [ "$MONTH_CACHE_VALID" = "1" ]; then
+    MONTH_TOTAL_RAW=$(jq -r '.total' "$MONTH_CACHE" 2>/dev/null)
+else
+    MONTH_START_EPOCH=$(date -j -f "%Y-%m-%d %H:%M:%S" "${MONTH_KEY}-01 00:00:00" "+%s" 2>/dev/null || \
+                        date -d "${MONTH_KEY}-01" "+%s" 2>/dev/null)
+    NEXT_MONTH=$(date -j -r $((MONTH_START_EPOCH + 32*86400)) "+%Y-%m" 2>/dev/null || \
+                 date -d "@$((MONTH_START_EPOCH + 32*86400))" "+%Y-%m" 2>/dev/null)
+    NEXT_MONTH_EPOCH=$(date -j -f "%Y-%m-%d %H:%M:%S" "${NEXT_MONTH}-01 00:00:00" "+%s" 2>/dev/null || \
+                       date -d "${NEXT_MONTH}-01" "+%s" 2>/dev/null)
+    MONTH_START_UTC=$(date -j -r "$MONTH_START_EPOCH" -u "+%Y-%m-%dT%H:%M:%S" 2>/dev/null || \
+                      date -u -d "@$MONTH_START_EPOCH" "+%Y-%m-%dT%H:%M:%S" 2>/dev/null)
+    NEXT_MONTH_UTC=$(date -j -r "$NEXT_MONTH_EPOCH" -u "+%Y-%m-%dT%H:%M:%S" 2>/dev/null || \
+                     date -u -d "@$NEXT_MONTH_EPOCH" "+%Y-%m-%dT%H:%M:%S" 2>/dev/null)
+
+    MONTH_TOTAL_RAW=$(find "$CLAUDE_DIR/projects" -name "*.jsonl" -print0 2>/dev/null | \
+        xargs -0 jq -r --arg s "$MONTH_START_UTC" --arg e "$NEXT_MONTH_UTC" '
+            select(.type == "assistant" and .message.id != null and
+                   .timestamp >= $s and .timestamp < $e) |
+            [.timestamp, .message.id, (.message.model // ""),
+             (.message.usage.input_tokens // 0),
+             (.message.usage.cache_creation_input_tokens // 0),
+             (.message.usage.cache_read_input_tokens // 0),
+             (.message.usage.output_tokens // 0)] | @tsv
+        ' 2>/dev/null | \
+        sort -t"	" -k1,1 | awk -F"	" '
+            function cost(model, inp, cc, cr, out) {
+                if (model ~ /opus-4-[56]/)
+                    return (inp/1e6)*5 + (cc/1e6)*6.25 + (cr/1e6)*0.5 + (out/1e6)*25
+                else if (model ~ /opus-4/)
+                    return (inp/1e6)*15 + (cc/1e6)*18.75 + (cr/1e6)*1.5 + (out/1e6)*75
+                else if (model ~ /haiku/)
+                    return (inp/1e6)*1 + (cc/1e6)*1.25 + (cr/1e6)*0.1 + (out/1e6)*5
+                else
+                    return (inp/1e6)*3 + (cc/1e6)*3.75 + (cr/1e6)*0.3 + (out/1e6)*15
+            }
+            !seen[$2]++ { total += cost($3, $4, $5, $6, $7) }
+            END { printf "%.3f", total+0 }
+        ')
+    NOW_MONTH_TS=$(date +%s)
+    printf '{"month":"%s","total":%s,"computed_at":%s}\n' \
+        "$MONTH_KEY" "${MONTH_TOTAL_RAW:-0}" "$NOW_MONTH_TS" > "$MONTH_CACHE"
+fi
+
+MONTH_TOTAL=$(printf "%.2f" "${MONTH_TOTAL_RAW:-0}")
+METRICS="${METRICS}$(printf ' \033[90m|\033[0m Month: \033[32m$%s\033[0m' "$MONTH_TOTAL")"
+
 printf '\033[36m%s\033[0m%s%s' "$DIR_NAME" "$GIT_STATUS" "$METRICS"
