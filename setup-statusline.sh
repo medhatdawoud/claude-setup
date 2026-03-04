@@ -34,24 +34,46 @@ echo "Updated settings.json: statusLine points to $CLAUDE_DIR/statusline.sh"
 
 echo ""
 echo "Configure statusline sections (Enter = yes, default all on):"
+echo ""
 
 ask() {
-    local label="$1" flag="$2"
-    read -r -p "  Include $label? [Y/n]: " ans
+    local label="$1" flag="$2" example="$3"
+    read -r -p "  Include $label? (e.g. $example) [Y/n]: " ans
     [[ "${ans:-y}" =~ ^[Yy] ]] && echo "${flag}=1" || echo "${flag}=0"
+}
+
+ask_rtk() {
+    read -r -p "  Include RTK savings? (e.g. ✂️ 1.5M (5.5%)) [Y/n]: " ans
+    if [[ "${ans:-y}" =~ ^[Yy] ]]; then
+        if ! command -v rtk &>/dev/null; then
+            echo ""
+            echo "  WARNING: rtk is not installed."
+            echo "  Install:  brew install rtk"
+            echo "  Activate: rtk init -g --auto-patch"
+            echo "  Verify:   rtk gain"
+            echo ""
+            read -r -p "  Keep RTK enabled (assuming you will install it)? [Y/n]: " confirm
+            [[ "${confirm:-y}" =~ ^[Yy] ]] && echo "STATUSLINE_RTK=1" || echo "STATUSLINE_RTK=0"
+        else
+            echo "STATUSLINE_RTK=1"
+        fi
+    else
+        echo "STATUSLINE_RTK=0"
+    fi
 }
 
 CONF="$CLAUDE_DIR/statusline.conf"
 {
-    ask "git branch + diff" STATUSLINE_GIT
-    ask "session tokens + cost" STATUSLINE_SESSION
-    ask "context window bar" STATUSLINE_CONTEXT
-    ask "RTK savings" STATUSLINE_RTK
-    ask "model name" STATUSLINE_MODEL
-    ask "today tokens + cost" STATUSLINE_TODAY
-    ask "monthly cost" STATUSLINE_MONTH
+    ask "git branch + diff"    STATUSLINE_GIT     "🌿 main +5 -2"
+    ask "session tokens + cost" STATUSLINE_SESSION "🔸 12.3K 💰 \$0.042"
+    ask "context window bar"   STATUSLINE_CONTEXT "23% ━━━─────────"
+    ask_rtk
+    ask "model name"           STATUSLINE_MODEL   "🧠 Sonnet 4.6"
+    ask "today tokens + cost"  STATUSLINE_TODAY   "Today: (🔸 45.2K 💰 \$0.156)"
+    ask "monthly cost"         STATUSLINE_MONTH   "Month: \$12.34"
 } > "$CONF"
 
+echo ""
 echo "Config written to $CONF"
 echo ""
 echo "Status line setup complete. Restart Claude Code to apply."
