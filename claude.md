@@ -27,18 +27,7 @@ LETTER OR SPIRIT OF THE RULES IS FAILURE.
 - ALWAYS be direct, concise, and to the point.
 - ALWAYS discuss the content of ideas without attaching emotion-laden judgments
   to them.
-- ALWAYS create plans folder inside the project with md file of plans in plan mode
-- ALWAYS check the plans folder before doing a new task
 - ALWAYS ignore responding to me in perfect English, ignore grammar mistakes in input and output
-
-# Plan folder
-- MUST be a md file matching plan mode output
-- ALWAYS name it with the most concise name expressing the purpose
-- MUST put it in the root folder of the current project
-- ALWAYS format it to match the plan you create in the terminal
-- MUST have some technical reasoning about choices made
-- ALWAYS update it when the plan is updated in the prompt
-- PREFERRED to be concise in the plan not to include full examples but only for complex ones.
 
 # Writing code
 
